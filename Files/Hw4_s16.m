@@ -1,0 +1,141 @@
+%% Part 1 ( ready file -- preapare data) - subject 16
+Fs = 256;
+clear;close all;clc;
+c1 = edfread("Sub16\WS16\chb16_10.edf");
+c2 = edfread("Sub16\WS16\chb16_11.edf");
+c3 = edfread("Sub16\WS16\chb16_14.edf");
+c4 = edfread("Sub16\WS16\chb16_16.edf");
+c = edfread("Sub16\WOS16\chb16_07.edf");
+s_time = [2289,1119,1853,1213];
+s1 = getDataBeforeTime(c1, s_time(1));
+s1 = getMatrix(s1,23);
+s2 = getDataBeforeTime(c2, s_time(2));
+s2 = getMatrix(s2,23);
+s3 = getDataBeforeTime(c3, s_time(3));
+s3 = getMatrix(s3,23);
+ns1 = getDataBeforeTime(c,800);
+ns1 = getMatrix(ns1,23);
+ns3 = getDataBeforeTime(c,1400);
+ns3 = getMatrix(ns3,23);
+ns4 = getDataBeforeTime(c,2100);
+ns4 = getMatrix(ns4,23);
+
+s4 = getDataBeforeTime(c4, s_time(4));
+s4 = getMatrix(s4,23);
+ns2 = getDataBeforeTime(c,1600);
+ns2 = getMatrix(ns2,23);
+clear c1 c2 c3 c4 c5 c6 c
+clc;
+%%
+% Processing data
+features_s1 = getFeature(s1);
+features_s2 = getFeature(s2);
+features_s3 = getFeature(s3);
+features_s4 = getFeature(s4);
+features_ns1 = getFeature(ns1);
+features_ns3 = getFeature(ns3);
+features_ns4 = getFeature(ns4);
+train_data = [features_s1;features_ns3;features_s2;features_ns4;features_s3;features_ns1];
+% for test
+features_ns2 = getFeature(ns2);
+test_data = [features_ns2;features_s4];
+% feature Selection
+figure
+stem(features_s1)
+title('Epilepsy happened')
+xlabel('Attributes')
+ylabel('Amplitude')
+
+figure
+stem(features_ns1)
+title('Epilepsy not happened')
+xlabel('Attributes')
+ylabel('Amplitude')
+%%
+train_labels = [1,-1,1,-1,1,-1]';
+test_labels = [-1,1]';
+[train_data, test_data] = tTestSelection(train_data,test_data,train_labels,0.01);
+figure
+stem(train_data(1,:))
+title('Epilepsy happened')
+xlabel('Selected Attributes')
+ylabel('Amplitude')
+
+figure
+stem(train_data(6,:))
+title('Epilepsy not happened')
+xlabel('Selected Attributes')
+ylabel('Amplitude')
+%% Classification SVM
+svmModel = fitcsvm(train_data,train_labels);
+predictedLabels = predict(svmModel, test_data);
+%% Classification KNN
+k = 3;
+knnModel = fitcknn(train_data, train_labels, 'NumNeighbors',k);
+predictions_knn = predict(knnModel,test_data);
+
+%% in next parts we do same thing using k-fold one leave out
+%% Leave on out
+
+% KNN
+
+data = [train_data;test_data];
+labels = [train_labels;test_labels];
+trueLabels = labels;
+predictedLabels_KNN_l = zeros(8, 1);
+TP = 0;
+FP = 0;
+% Leave-One-Out Cross-Validation
+for i = 1:8
+    trainingData = data([1:i-1, i+1:end], :);
+    trainingLabels = labels([1:i-1, i+1:end]);
+    
+    testData = data(i, :);
+    [trainingData, testData] = tTestSelection(trainingData,testData,trainingLabels,0.01);
+    knnModel = fitcknn(trainingData, trainingLabels, 'NumNeighbors', k);
+    predictedLabel = predict(knnModel, testData);
+
+    predictedLabels_KNN_l(i) = predictedLabel;
+    if predictedLabel == 1 && trueLabels(i) == 1
+            TP = TP + 1; % True positive
+    elseif predictedLabel == 1 && trueLabels(i) == -1
+            FP = FP + 1; % False positive
+    end
+end
+
+accuracy = sum(predictedLabels_KNN_l == labels) / 8;
+TPR = TP / sum(trueLabels == 1); % True Positive Rate (Sensitivity)
+FPR = FP / sum(trueLabels == -1); % False Positive Rate
+
+disp(['Accuracy KNN: ', num2str(accuracy)]);
+disp(['True Positive Rate (Sensitivity) KNN: ', num2str(TPR)]);
+disp(['False Positive Rate KNN: ', num2str(FPR)]);
+%%
+predictedLabels_SVM_l = zeros(8, 1);
+TP = 0;
+FP = 0;
+% Leave-One-Out Cross-Validation
+for i = 1:8
+    trainingData = data([1:i-1, i+1:end], :);
+    trainingLabels = labels([1:i-1, i+1:end]);
+    
+    testData = data(i, :);
+    [trainingData, testData] = tTestSelection(trainingData,testData,trainingLabels,0.01);
+    SVMModel = fitcsvm(trainingData,trainingLabels);
+    predictedLabel = predict(SVMModel, testData);
+
+    predictedLabels_SVM_l(i) = predictedLabel;
+    if predictedLabel == 1 && trueLabels(i) == 1
+            TP = TP + 1; % True positive
+    elseif predictedLabel == 1 && trueLabels(i) == -1
+            FP = FP + 1; % False positive
+    end
+end
+
+accuracy = sum(predictedLabels_SVM_l == labels) / 8;
+TPR = TP / sum(trueLabels == 1); % True Positive Rate (Sensitivity)
+FPR = FP / sum(trueLabels == -1); % False Positive Rate
+
+disp(['Accuracy SVM: ', num2str(accuracy)]);
+disp(['True Positive Rate (Sensitivity) SVM: ', num2str(TPR)]);
+disp(['False Positive Rate SVM: ', num2str(FPR)]);
